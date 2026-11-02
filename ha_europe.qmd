@@ -1,0 +1,886 @@
+---
+title: "Geschlechterspezifische Unterschiede in der Erwerbsbeteiligung in den EU-Mitgliedstaaten im ESS 11"
+author: "Christopher Berberich"
+lang: de
+date: 2026-11-02
+
+format:
+  pdf:
+    toc: false
+    toc-depth: 1
+    toc-title: "Inhaltsverzeichnis"
+    number-sections: true
+    parskip: 10pt
+    linestretch: 1.5
+    colorlinks: true
+    linkcolor: black
+    urlcolor: black
+    citecolor: black
+    geometry:
+      - top=25mm
+      - bottom=25mm
+      - left=20mm
+      - right=50mm
+    template-partials:
+      - "/home/chris/Dokumente/Studium/HA Europa/before-body.tex"
+    include-in-header:
+      text: |
+        \usepackage{geometry}
+        \usepackage[font=footnotesize, labelfont=bf]{caption}
+bibliography: references.bib
+csl: kolner-zeitschrift-fur-soziologie-und-sozialpsychologie.csl
+---
+
+```{r}
+#| echo: false
+#| message: false
+#| warning: false
+#| label: setup-import
+#| include: false
+
+# ============================================================
+# Term paper "European Integration"
+# Gender differences in labour market integration across
+# EU member states (ESS Round 11)
+# ============================================================
+
+# ------------------------------------------------------------
+# 1. Packages
+# ------------------------------------------------------------
+
+library(tidyverse)
+library(marginaleffects)
+library(modelsummary)
+library(knitr)
+library(broom.mixed)
+library(kableExtra)
+library(patchwork)
+library(lme4)
+library(DHARMa)
+
+# ------------------------------------------------------------
+# 2. Working directory
+# ------------------------------------------------------------
+
+setwd("/home/chris/Dokumente/Studium/HA Europa/")
+
+# ------------------------------------------------------------
+# 3. Import prepared analysis data
+# ------------------------------------------------------------
+
+ess_full  <- readRDS("Analysis/Data/ess_full.rds")
+ess_hours <- readRDS("Analysis/Data/ess_hours.rds")
+
+# ------------------------------------------------------------
+# 4. Output directory
+# ------------------------------------------------------------
+
+output_dir <- "Analysis/Output/"
+
+
+# ------------------------------------------------------------
+# Model comparison tables (LRT)
+# ------------------------------------------------------------
+
+lrt_binary <- readRDS(paste0(output_dir, "lrt_binary.rds"))
+lrt_hours  <- readRDS(paste0(output_dir, "lrt_hours.rds"))
+
+# ------------------------------------------------------------
+# Final models
+# ------------------------------------------------------------
+
+final_binary <- readRDS(paste0(output_dir, "final_binary.rds"))
+final_hours  <- readRDS(paste0(output_dir, "final_hours.rds"))
+
+# ------------------------------------------------------------
+# All four models for the 4-column regression table
+# ------------------------------------------------------------
+
+hurdle_binary_ri <- readRDS(paste0(output_dir, "hurdle_binary_ri.rds"))
+hurdle_binary_rs <- readRDS(paste0(output_dir, "hurdle_binary_rs.rds"))
+hurdle_hours_ri  <- readRDS(paste0(output_dir, "hurdle_hours_ri.rds"))
+hurdle_hours_rs  <- readRDS(paste0(output_dir, "hurdle_hours_rs.rds"))
+
+# ------------------------------------------------------------
+# AMEs 
+# ------------------------------------------------------------
+
+
+ames <- readRDS("Analysis/Output/ames.rds")
+
+
+# ------------------------------------------------------------
+# Random effects
+# ------------------------------------------------------------
+
+ranef_binary <- readRDS(paste0(output_dir, "ranef_binary.rds"))
+ranef_hours  <- readRDS(paste0(output_dir, "ranef_hours.rds"))
+
+# ------------------------------------------------------------
+# Diagnostics
+# ------------------------------------------------------------
+
+sim_binary <- readRDS(paste0(output_dir, "sim_binary.rds"))
+sim_hours  <- readRDS(paste0(output_dir, "sim_hours.rds"))
+```
+
+\newpage
+
+\mbox{} \vspace{1.5cm} \setcounter{tocdepth}{1} \tableofcontents \newpage
+
+\newpage
+
+# Einleitung
+
+Die Gleichstellung von Frauen und Männern auf dem Arbeitsmarkt ist ein erklärtes Ziel der Europäischen Union (EU). Im Beschluss (EU) 2022/2296 zu den beschäftigungspolitischen Leitlinien der Mitgliedstaaten heißt es dazu: „Gegen das geschlechtsspezifische Beschäftigungs- und Lohngefälle und gegen Geschlechterstereotype sollte vorgegangen werden. Die Mitgliedstaaten sollten die Gleichstellung der Geschlechter und eine höhere Erwerbsbeteiligung von Frauen sicherstellen“.
+
+Für die geschlechtsspezifischen Unterschiede in der Erwerbsbeteiligung sind nach @lewis1992 nicht allein spezifische individuelle Umstände entscheidend, sondern vor allem institutionelle Rahmenbedingungen für die familiäre Sorgearbeit und deren sozialstaatliche Absicherung von Bedeutung. Die EU möchte dem entgegenwirken, indem sie „die Vereinbarkeit von Berufs-, Privat- und Familienleben sowohl für Frauen als auch für Männer \[...\] insbesondere durch den Zugang zu erschwinglicher, hochwertiger Langzeitpflege und zu erschwinglichen, hochwertigen Diensten für frühkindliche Betreuung, Bildung und Erziehung \[...\]“ fördert [@beschlus2022].
+
+Während sich die EU also um Gleichstellung bemüht, legt die Literatur [@lewis1992; @lewis1994; @saraceno2010] nahe, dass sich verschiedenen Länder in unterschiedlichen Ausgangslagen befinden. Diese Arbeit widmet sich diesen Unterschieden und folgt der Fragestellung: Zeigen die Mitgliedsstaaten der europäischen Union Unterschiede in der geschlechtsspezifischen Erwerbsbeteiligung und wie variieren diese zwischen den untersuchten Mitgliedsstaaten?
+
+Dabei bildet @lewis1992 Perspektive auf geschlechtsspezifische Wohlfahrtsstaatsstrukturen und das male breadwinner model im Kontext bisheriger empirischer Befunde den theoretischen Ausgangspunkt. Im empirischen Teil wird anschließend anhand von Daten des European Social Survey (Runde 11) mittels Mehrebenenanalyse geprüft, ob ein Zusammenhang zwischen Geschlecht und Erwerbsbeteiligung besteht und ob sich die Stärke dieses Zusammenhangs zwischen den untersuchten EU-Mitgliedstaaten unterscheidet. Die Unterschiede des länderspezifischen Zusammenhangs werden explorativ erleutert. Abschließend werden die Ergebnisse vor dem Hintergrund der theoretischen Annahmen diskutiert.
+
+# Theorie
+
+Die geschlechtsspezifische Ungleichheit in der Erwerbsbeteiligung ist kein rein individuelles Phänomen, sondern wird auch durch die institutionelle Ausgestaltung des Wohlfahrtsstaates geprägt. Das Kapitel führt zunächst das Male-Breadwinner State Model nach @lewis1992 ein und diskutiert die heterogene Ausgestaltung wohlfahrtsstaatlicher Care-Politiken.
+
+Die Erwerbsbeteiligung bezeichnet die Teilnahme am Erwerbsleben und ist ein zentraler Gegenstand der Forschung zu geschlechtsspezifischen Unterschieden auf dem Arbeitsmarkt. @vlasblom2004 zeigen empirisch, dass der Anstieg des Arbeitskräfteangebots von Frauen in den 90ern nicht durch Veränderungen im Bildungsniveau oder der Kinderzahl erklärt werden kann. Sie legen Nahe, dass institutionelle Entwicklungen eine Rolle spielen. Eine neuere Studie von @kesler2018 untersucht ebenfalls geschlechtsspezifische Unterschiede in der Erwerbsbeteiligung und zeigt, dass arbeits- und familienpolitische Maßnahmen, insbesondere die öffentliche Kinderbetreuung, mit einer höheren Erwerbsbeteiligung von Frauen zusammenhängen.
+
+Eine Theorie über die geschlechtsspezifische Erwerbsbeteiligung entstammt der Kritik klassischer Ansätze der vergleichenden Wohlfahrtsstaatsforschung wie jener von @esping-andersen1990. Solche Theorien haben lange das Verhältnis von Staat und Arbeitsmarkt in den Mittelpunkt gestellt, ohne die geschlechtsspezifische Verteilung unbezahlter Arbeit systematisch einzubeziehen. @lewis1992 kritisiert diese Leerstelle: Da Frauen historisch ihre sozialstaatlichen Ansprüche über ihre Abhängigenrolle als Ehefrauen und Mütter erwarben und dieses historische Erbe weiterhin wirkmächtig ist, lässt sich die gesellschaftliche Stellung von Frauen im Wohlfahrtsstaat nicht unabhängig von der institutionellen Organisation familialer Sorgearbeit betrachten. Daraus leitet sie ab, dass die Position von Frauen auf dem Arbeitsmarkt nur vor diesem Hintergrund betrachtet werden muss. Lewis Analyse der Wohlfahrtsstaaten liegt der Idealtypus des Male-Breadwinner Family Models [@land1980] zugrunde, demzufolge der Mann als Hauptverdiener der Familie fungiert, während die Frau zu Hause bleibt und unbezahlte Sorgearbeit verrichtet. An diesem Modell orientieren sich die Wohlfahrtsstaaten in unterschiedlichem Maße, obgleich niemals in der Geschichte ein Staat dem Modell vollständig entsprochen hat. Anhand einiger Beispiele unterscheidet Lewis zwischen starken, modifizierten und schwachen Ausprägungen. 
+
+Großbritannien und Irland ordnet @lewis1992 als starke Male-Breadwinner States ein, allerdings mit zwei verschiedenen Charakteristika der Arbeitsmarktintegration: Irland, wo Frauen sehr häufig gar nicht arbeiten und Großbritannien, wo Frauen häufig Teilzeit mit sehr niedrigem Stundenumfang (oft unter 16 Stunden pro Woche) arbeiten. Derselbe Mechanismus führt hier also je nach landesspezifischen Umständen zu nicht identischen Outcomes. Frankreich dient als Beispiel für einen modifizierten Male-Breadwinner State und Schweden als schwacher. Später kommen noch Deutschland und die Niederlande als starke Beispiele hinzu [@lewis1994]. Nach Lewis Theorie unterscheiden sich Wohlfahrtsstaaten also systematisch in der institutionellen Ausgestaltung von Besteuerung, Kinderbetreuung und Elternversicherung, wodurch sich die Stärke des Male-Breadwinner-Modells zwischen Ländern unterscheidet. Allerdings geben @lewis1994 [S. 19] in einer Fußnote zu, dass in die Kategorie der strong Male-Breadwinner States sehr verschiedene Länder fallen. Im Ergebnis kategorisiert Lewis insgesamt sechs Staaten, die jedoch auf unterschiedlichste Voraussetzungen zurückgeführt werden.
+
+Während @lewis1992 anhand von Fallbeispielen eine theoretische Typologie konstruiert, analysieren @saraceno2010 empirisch die staatliche Betreuungs- und Pflegepolitik in den 27 EU-Mitgliedstaaten, um Care-Policy-Regime zu identifizieren. Trotz großer Unterschiede zwischen den Staaten erweisen sich die einzelnen Politikbereiche dabei jedoch als derart widersprüchlich strukturiert, dass sich kaum empirisch kohärente Cluster bilden lassen („policy regimes are mostly mixed“, Saraceno und Keck, S. 691), da verschiedene politische Maßnahmen keiner einer Agenda folgen.
+
+Obwohl die von Lewis benannten institutionellen Faktoren theoretisch plausibel bleiben, spricht die Heterogenität in der Zusammensetzung der Policies in den verschiedenen Staaten gegen eine strikte Kategorisierung. Dementsprechend werden in dieser Arbeit Länder als Proxy für diese gebündelte institutionelle Heterogenität verwendet, ohne dass einzelne Mechanismen separat geprüft werden. Dabei besteht das Problem, dass die Länderproxys nicht nur institutionelle, sondern auch kulturelle Unterschiede messen. Allerdings legt die Empirie nahe, dass eine stärkere institutionelle Unterstützung kulturelle Mechanismen neutralisiert [@kesler2018].
+
+Ausgehend von der theoretischen Perspektive des Male-Breadwinner State Modells wird zunächst als Grundlage erwartet, dass Frauen eine geringere Wahrscheinlichkeit der Erwerbsbeteiligung aufweisen als Männer.
+
+H1: Frauen haben eine geringere Erwerbswahrscheinlichkeit als Männer (AME \< 0).
+
+Darüber hinaus wird erwartet, dass sich der Zusammenhang zwischen Geschlecht und Erwerbsbeteiligung zwischen den Staaten unterscheidet. Diese Erwartung folgt aus der Annahme, dass die institutionellen und gesellschaftlichen Rahmenbedingungen der Erwerbsbeteiligung zwischen den EU-Mitgliedstaaten variieren. Die konkrete Richtung dieser länderspezifischen Unterschiede wird dabei nicht theoretisch festgelegt.
+
+H2: Der Geschlechterunterschied in der Erwerbswahrscheinlichkeit variiert zwischen den Staaten ($\sigma^2_{u_{1j}} > 0$).
+
+Da die Hypothese nicht mehr aussagt, als dass sich die untersuchten EU-Mitgliedsstaaten unterscheiden, sowie keine Rangordnung getestet wird, werden die Länderunterschiede zusätzlich explorativ beschrieben.
+
+# Methodik
+
+## Code und Daten
+
+Die Analyse nutzt Daten der 11. Runde des European Social Survey (ESS). Berücksichtigt werden die `r n_distinct(ess_full$country)` Mitgliedstaaten der Europäischen Union, die im Datensatz enthalten sind. Die Stichprobe wird auf Personen im Alter von 18 bis einschließlich 70 Jahren beschränkt. Fälle mit fehlenden Angaben in den für die Analyse benötigten Variablen werden ausgeschlossen.
+
+Die statistische Analyse wurde in R 4.6.1 programmiert und ist verfügbar unter: `\mbox{\url{https://github.com/chrberberich/ha_europe}}`{=latex}.
+
+## Operationalisierung
+
+Es werden zwei Modelle mit identischen Adjustmentset geschätzt. Die abhängige Variable ist die Erwerbsbeteiligung (emp, 0 = geht keiner bezahlten Arbeit nach, 1 = geht bezahlter Arbeit nach).
+
+Die für die Hypothesen relevante unabhängige Variable ist das Geschlecht (gen, 0 = Mann, 1 = Frau). Als Kontrollvariablen werden das Alter (age) und die aktuelle Teilnahme an einem Bildungsprogramm (z. B. Studium, Schule; edu, 0 = nicht in Ausbildung, 1 = in Ausbildung) aufgenommen. Beide hängen mit der Erwerbsbeteiligung zusammen, hingegen aber kaum mit dem Geschlecht: In den Daten zeigt sich für die Bildungsteilnahme kein und für das Alter nur ein sehr kleiner Zusammenhang. Während die Standardfehler der Logit-Koeffizienten und Odds Ratios durch zusätzliche Prädiktoren zuzunehmen [@robinson1991], zeigt sich jedoch empirisch, dass die zusätzlichen Prädiktoren die Präzision des Average Marginal Effect (AME) erhöhen, ohne ihn inhaltlich zu verschieben. Damit kann die Auswahl dem optimal adjustment set Theorem für lineare Modelle folgen [@henckel2022]. Der Einfluss von edu auf die Präzision ist allerdings klein. Zu den empirischen Tests siehe R-Output im Anhang.
+
+Das Alter wird in Jahren gemessen, am jeweiligen Stichprobenmittelwert zentriert und sowohl linear als auch quadratisch modelliert:
+
+$\text{Age}_{c,ij} = \text{Age}_{ij} - \overline{\text{Age}}$
+
+$\text{Age}_{c,ij}^2 = (\text{Age}_{ij} - \overline{\text{Age}})^2$
+
+Der quadratische Altersterm ermöglicht die Berücksichtigung eines nichtlinearen Zusammenhangs zwischen Alter und Erwerbsbeteiligung und folgt dabei früheren Publikationen [siehe hierzu @vlasblom2004; @doan2024; @kesler2018]
+
+## Mehrebenenmodell
+
+Die theoretische Annahme, dass sich die Rahmenbedingungen der Erwerbsbeteiligung zwischen EU-Mitgliedstaaten unterscheiden, wird empirisch durch eine Mehrebenenstruktur abgebildet. Das Land dient dabei als Proxy für die ideosynkratische institutionelle und gesellschaftliche Zusammensetzung.
+
+Modell 1 enthält einen länderspezifischen Random Intercept. Damit kann sich das durchschnittliche Niveau der abhängigen Variable zwischen den EU-Mitgliedsstaaten unterscheiden. Modell 2 ergänzt einen Random Slope für das Geschlecht und erlaubt damit eine Variation des Geschlechtereffekts zwischen eben diesen Staaten.
+
+Da der Erwerbsstatus binär ist, wird ein logistisches Modell geschätzt. Modell 1 ist wie folgt spezifiziert:
+
+$$\operatorname{logit}\left[P(emp_{ij}=1)\right]
+=
+\beta_0
++\beta_1 gen_{ij}
++\beta_2 age_{c, ij}
++\beta_3 age_{c, ij}^{2}
++\beta_4 edu_{ij}
++u_{0j}.$$
+
+Dabei gilt $u_{0j}\sim N(0,\sigma_{u0}^{2})$.
+
+Modell 2 erweitert die Spezifikation um einen zufälligen Geschlechtseffekt:
+
+$$\operatorname{logit}\left[P(emp_{ij}=1)\right]
+=
+\beta_0
++(\beta_1+u_{1j}) gen_{ij}
++\beta_2 age_{c, ij}
++\beta_3 age_{c, ij}^{2}
++\beta_4 edu_{ij}
++u_{0j}$$
+
+Die Zufallseffekte werden als bivariat normalverteilt angenommen:
+
+$$\begin{pmatrix}
+u_{0j}\\
+u_{1j}
+\end{pmatrix}
+\sim
+N
+\left(
+\begin{pmatrix}
+0\\
+0
+\end{pmatrix},
+\Sigma_u
+\right)$$
+
+Intercept und Random Slope dürfen dabei korrelieren. Die Varianz $\sigma_{u1}^{2}$ beschreibt die zwischenstaatliche Variation des Geschlechtereffekts auf die Erwerbswahrscheinlichkeit.
+
+## Auswertung und Modellvergleich
+
+H1 wird anhand des AME des festen Geschlechtseffekts $AME_{gen}$ in Modell 1 und 2 beurteilt (95-%-Wald-Konfidenzintervall). H2 wird durch einen Likelihood-Ratio-Test von Modell 1 gegen Modell 2 geprüft:
+
+$$ LR = -2\left(\ell^{(1)} - \ell^{(2)}\right)$$
+
+Die Nullhypothese lautet $H_0:\sigma_{u1}^{2}=0$. Da diese Varianz bei $H_0$ am Rand des Parameterraums liegt und Modell 2 zusätzlich die Kovarianz $\sigma_{u01}$ enthält, wird $LR$ gegen die Mischverteilung $0.5\chi_1^2+0.5\chi_2^2$ geprüft [@self1987; @stram1994]. Ergänzend werden AIC und BIC berichtet. Als Maß für die Größe der Heterogenität dient $\hat\sigma_{u1j}$.
+
+Explorativ werden aus Modell 2 länderspezifische Geschlechterkontraste auf der Wahrscheinlichkeitsskala berechnet (AME mit den geschätzten Random Effects des jeweiligen Landes) und nach ihrer Größe geordnet. Das Ranking dient ausschließlich der Exploration, nicht der Prüfung einer theoretisch vorgegebenen Rangordnung.
+
+# Ergebnisse
+
+## Deskriptive Statistik
+
+Die bereinigte Stichprobe umfasst 30 018 Personen im Alter von 18 bis 70 Jahren aus 22 EU-Mitgliedstaaten. Davon sind 16 071 Personen Frauen (53.5 %) und 13.947 Männer. Insgesamt gehen 66.6 % der Befragten einer bezahlten Arbeit nach. Dieser Anteil liegt bei Frauen mit 62,5 % um 8.8 Prozentpunkte niedriger als bei Männern (71.3 %). Frauen und Männer unterscheiden sich in den beiden Kontrollvariablen kaum: Der Anteil der Personen in Ausbildung beträgt 7.4 % bzw. 7.1 %, das Durchschnittsalter 47.1 bzw. 46.5 Jahre (SD = 14.6 bzw. 14.9).
+
+```{r}
+#| label: tbl-descriptives
+#| tbl-cap: "Stichprobe Gesamt und nach Geschlecht"
+#| message: false
+#| warning: false
+#| echo: false
+
+
+# ============================================================
+# Helper functions: number formatting
+# ============================================================
+
+fmt <- function(x, digits = 1) {
+  formatC(x, format = "f", digits = digits, big.mark = ",")
+}
+
+# Share in percent, without the % sign (the unit is in the row label)
+pct <- function(x) fmt(100 * x, 1)
+
+
+# ============================================================
+# Sample A: employment status (logit models) -- ACTIVE
+# All statistics are UNWEIGHTED, so the table matches the
+# (unweighted) model sample.
+# ============================================================
+
+describe_employment <- function(d) {
+  c(
+    fmt(nrow(d), 0),
+    pct(mean(d$emp == 1L)),
+    pct(mean(d$edu == "in education")),
+    fmt(mean(d$age), 2),
+    fmt(sd(d$age), 2)
+  )
+}
+
+tab_employment <- tibble(
+  Merkmal = c(
+    "N",
+    "Beschäftigt (%)",
+    "In Ausbildung, letzte 7 Tage (%)",
+    "Mittelwert",
+    "Standardabweichung"
+  ),
+  Gesamt = describe_employment(ess_full),
+  Frauen = describe_employment(filter(ess_full, gen == "Female")),
+  Männer = describe_employment(filter(ess_full, gen == "Male"))
+)
+
+tab_employment <- tibble(
+  Merkmal = c(
+    "N",
+    "emp (%)",
+    "edu (%)",
+    "Mittelwert",
+    "Standardabweichung"
+  ),
+  Gesamt = describe_employment(ess_full),
+  Frauen = describe_employment(filter(ess_full, gen == "Female")),
+  Männer = describe_employment(filter(ess_full, gen == "Male"))
+)
+
+tab_employment |>
+  kbl(
+    col.names = c("Merkmal", "Gesamt", "Frauen", "Männer"),
+    align     = "lrrr",
+    booktabs  = TRUE
+  ) |>
+  kable_styling(
+    bootstrap_options = c("striped", "hover", "condensed"),
+    latex_options     = c("striped", "HOLD_position"),
+    full_width        = FALSE
+  ) |>
+  # Only the age rows are grouped and indented
+  pack_rows("age (Jahre)", 4, 5, bold = FALSE, italic = TRUE)
+
+
+# ============================================================
+# Sample B: weekly hours (Gaussian models) -- COMMENTED OUT
+# To enable: move this block into its own chunk with its own
+# label and tbl-cap (one table per chunk).
+# ============================================================
+
+# describe_hours <- function(d) {
+#   c(
+#     fmt(nrow(d), 0),
+#     pct(mean(d$edu == "in education")),
+#     fmt(mean(d$age), 2),
+#     fmt(sd(d$age), 2),
+#     fmt(mean(d$wwh), 2),
+#     fmt(sd(d$wwh), 2)
+#   )
+# }
+#
+# tab_hours <- tibble(
+#   Merkmal = c(
+#     "N",
+#     "In Ausbildung, letzte 7 Tage (%)",
+#     "Mittelwert",
+#     "Standardabweichung",
+#     "Mittelwert",
+#     "Standardabweichung"
+#   ),
+#   Gesamt = describe_hours(ess_hours),
+#   Frauen = describe_hours(filter(ess_hours, gen == "Female")),
+#   Männer = describe_hours(filter(ess_hours, gen == "Male"))
+# )
+#
+# tab_hours |>
+#   kbl(
+#     col.names = c("Merkmal", "Gesamt", "Frauen", "Männer"),
+#     align     = "lrrr",
+#     booktabs  = TRUE
+#   ) |>
+#   kable_styling(
+#     bootstrap_options = c("striped", "hover", "condensed"),
+#     latex_options     = c("striped", "HOLD_position"),
+#     full_width        = FALSE
+#   ) |>
+#   # 2 rows (N, education) + 2 rows (age) + 2 rows (hours) = 6 rows
+#   pack_rows(index = c("Stichprobe" = 2, "Alter" = 2, "Wochenstunden" = 2))
+```
+
+Die Geschlechterlücke in der Erwerbstätigkeit zeigt sich in nahezu allen untersuchten EU-Mitgliedsstaaten (@tbl-countries). In 21 der 22 Länder liegt die Quote der Männer über der der Frauen. Die einzige Ausnahme ist Estland, wo beide Quoten nahezu identisch sind (77.4 % vs. 77.5 %). Die Größe der Differenz variiert jedoch: In Griechenland beträgt sie 22.7 Prozentpunkte, in Italien, Zypern, Polen, Bulgarien und Portugal jeweils zwischen 10.8 und 13.8 Prozentpunkte. In Schweden, Finnland, Frankreich, Deutschland, der Slowakei und Slowenien liegt sie hingegen unter 5 Prozentpunkten. Griechenland hat die mit Abstand größte Differenz. Die griechische Erwerbsbeteiligungsquote der Frauen (57.9 %) gehört zu den niedrigeren, ist aber nicht die niedrigste (Kroatien: 53.7 %). Gleichzeitig ist die Erwerbsquote der Männer 80.6% die höchste von allen.
+
+```{r}
+#| label: tbl-countries
+#| tbl-cap: "Beschäftigungsquote nach Geschlecht und Land"
+#| echo: false
+#| message: false
+#| warning: false
+
+# ============================================================
+# gender gaps in employment by country -- ACTIVE
+# ============================================================
+
+table_a1_employment <- ess_full |>
+  group_by(country) |>
+  summarise(
+    N     = n(),
+    emp_f = 100 * mean(emp[gen == "Female"]),
+    emp_m = 100 * mean(emp[gen == "Male"]),
+    .groups = "drop"
+  ) |>
+  mutate(emp_diff = emp_f - emp_m) |>
+  arrange(emp_diff)
+
+table_a1_employment |>
+  kbl(
+    col.names = c("Land", "N", "Frauen", "Männer", "Diff."),
+    digits    = c(0, 0, 1, 1, 1),
+    booktabs  = TRUE
+  ) |>
+  add_header_above(c(" " = 2, "Beschäftigungsquote in %" = 3)) |>
+  kable_styling(latex_options = c("striped", "HOLD_position"))
+
+
+# ============================================================
+# Appendix: gender gaps in weekly hours -- COMMENTED OUT
+# To enable: move this block into its own chunk with its own
+# label and tbl-cap.
+# ============================================================
+
+# table_a1_hours <- ess_hours |>
+#   group_by(country) |>
+#   summarise(
+#     N     = n(),
+#     hrs_f = mean(wwh[gen == "Female"]),
+#     hrs_m = mean(wwh[gen == "Male"]),
+#     .groups = "drop"
+#   ) |>
+#   mutate(hrs_diff = hrs_f - hrs_m) |>
+#   arrange(hrs_diff)
+#
+# table_a1_hours |>
+#   kbl(
+#     col.names = c("Land", "N", "Frauen", "Männer", "Diff."),
+#     digits    = c(0, 0, 1, 1, 1),
+#     booktabs  = TRUE
+#   ) |>
+#   add_header_above(c(" " = 2, "Wochenstunden unter Beschäftigten" = 3)) |>
+#   kable_styling(latex_options = c("striped", "HOLD_position"))
+```
+
+Alle berichteten Werte sind ungewichtet, da sie ebenfalls ungewichtet in die Modelle eingehen. 
+
+## Regression
+
+```{r}
+#| label: tbl-regression
+#| echo: false
+#| tbl-cap: "Regressionsergebnisse: random Intercept und random Intercept + random Slope. Die Standardabweichungen bewegen sich auf der Logitskala. Der AME für age_c^2 wird aufgrund der Quadratur nicht berichtet."
+
+
+# ------------------------------------------------------------
+# 1. Helper-Funktion: AMEs & Random Effects zusammenführen
+# ------------------------------------------------------------
+build_ame_modelsummary <- function(ame_df, model_obj) {
+  # AME-Fixeffekte extrahieren
+  tidy_fixed <- ame_df |>
+    dplyr::select(term, estimate, std.error, p.value, conf.low, conf.high)
+  
+  # Random Effects aus dem Originalmodell holen
+  tidy_ranef <- broom.mixed::tidy(model_obj, effects = "ran_pars", conf.int = FALSE) |>
+    dplyr::mutate(p.value = NA_real_)
+  
+  # Als modelsummary_list Objekt zurückgeben
+  res <- list(
+    tidy = dplyr::bind_rows(tidy_fixed, tidy_ranef),
+    glance = round(modelsummary::glance(model_obj), 1)
+  )
+  class(res) <- "modelsummary_list"
+  return(res)
+}
+
+# ------------------------------------------------------------
+# 2. Alle 4 Modelle aufbereiten
+# ------------------------------------------------------------
+m_logit_ri <- build_ame_modelsummary(ames$logit_ri_re, hurdle_binary_ri)
+m_logit_rs <- build_ame_modelsummary(ames$logit_rs_re, hurdle_binary_rs)
+# m_gauss_ri <- build_ame_modelsummary(ames$gauss_ri, hurdle_hours_ri)
+# m_gauss_rs <- build_ame_modelsummary(ames$gauss_rs, hurdle_hours_rs)
+
+# ------------------------------------------------------------
+# 3. Tabellenausgabe
+# ------------------------------------------------------------
+models_table <- list(
+  "Modell 1" = m_logit_ri,
+  "Modell 2" = m_logit_rs #,
+ # "1.2 Gauss RI" = m_gauss_ri,
+ # "2.2 Gauss RS" = m_gauss_rs
+)
+
+modelsummary(
+  models_table,
+  output = "kableExtra",
+  stars = TRUE,
+  statistic = "conf.int",
+  gof_map = c("nobs", "aic", "bic"),
+  coef_rename = c(
+    "gen"                          = linebreak("gen\n(Ref: Mann)"),
+    "edu"                          = linebreak("edu\n(Ref: nicht in Ausbildung)"),
+    "age_c"                        = linebreak("age\n(zentriert)"),
+    "age_c^2"                       = linebreak("age²\n(zentriert, quadriert)"),
+    "sd__(Intercept)"              = linebreak("SD\n(Intercept country)"),
+    "sd__genFemale"             = linebreak("SD\n(gen country)"),
+    "cor__(Intercept).genFemale"= linebreak("Cor\n(Intercept~gen country)"),
+    "sd__Observation"              = linebreak("SD\n(Residual)")
+  ),
+  escape = FALSE
+)
+```
+
+Die Ergebnisse der beiden logistischen Regressionsmodelle sind in @tbl-regression und @fig-logit-ranef dargestellt. Alter und Ausbildung gehen als Kontrollvariablen ein und werden nicht inhaltlich interpretiert.
+
+Frauen haben in beiden Modellen im Durchschnitt über alle Befragten der 22 untersuchten EU-Staaten eine geringere Erwerbswahrscheinlichkeit als Männer. In Modell 1 beträgt der Unterschied `{r} round(abs(100 * ames$logit_ri_re$estimate[ames$logit_ri_re$term == "gen"]), 1)` Prozentpunkte (AME = `{r} round(ames$logit_ri_re$estimate[ames$logit_ri_re$term == "gen"], 3)`, 95-%-KI \[`{r} round(ames$logit_ri_re$conf.low[ames$logit_ri_re$term == "gen"], 3)`; `{r} round(ames$logit_ri_re$conf.high[ames$logit_ri_re$term == "gen"], 3)`\], p \< 0.001), in Modell 2 sind es `{r} round(abs(100 * ames$logit_rs_re$estimate[ames$logit_rs_re$term == "gen"]), 1)` Prozentpunkte (AME = `{r} round(ames$logit_rs_re$estimate[ames$logit_rs_re$term == "gen"], 3)`, 95-%-KI \[`{r} round(ames$logit_rs_re$conf.low[ames$logit_rs_re$term == "gen"], 3)`; `{r} round(ames$logit_rs_re$conf.high[ames$logit_rs_re$term == "gen"], 3)`\], p \< 0.001). Beide Konfidenzintervalle schließen null aus, H1 wird somit beibehalten. Das Intervall in Modell 2 ist deutlich breiter, weil dieses Modell die Variation des Geschlechtereffekts zwischen den Staaten berücksichtigt. Beide Werte entsprechen weitgehend der unadjustierten Differenz von 8,8 Prozentpunkten (@tbl-descriptives); die Kontrolle von Alter und Bildung verändert die Differenz also kaum (siehe auch Methodik). Dieser Durchschnitt verbirgt jedoch Unterschiede zwischen den einzelnen Ländern.
+
+Die Varianz des Geschlechtereffekts zwischen den Staaten ist statistisch signifikant (LR = `{r} round(as.numeric(-2 * (logLik(hurdle_binary_ri) - logLik(hurdle_binary_rs))), 1)`, p \< 0.001), H2 wird somit ebenfalls von den Modellen gestützt. Auch AIC und BIC bevorzugen Modell 2 (ΔAIC = `{r} round(AIC(hurdle_binary_ri) - AIC(hurdle_binary_rs), 1)`, ΔBIC = `{r} round(BIC(hurdle_binary_ri) - BIC(hurdle_binary_rs), 1)`). Die Standardabweichung in der Variation des Geschlechtereffekts zwischen den Staaten beträgt $\hat\sigma_{u1j}$ = SD(gen country) = `{r} round(attr(lme4::VarCorr(hurdle_binary_rs)$country, "stddev")["genFemale"], 2)` auf der Logit-Skala. Damit weicht die Odds Ratio für Frauen im Vergleich zu Männern in einem Land, das eine Standardabweichung über oder unter dem Durchschnitt liegt, um den Faktor `{r} round(exp(attr(lme4::VarCorr(hurdle_binary_rs)$country, "stddev")["genFemale"]), 2)` vom durchschnittlichen Odds Ratio ab. Intercept und Slope sind nahezu unkorreliert (r = `{r} round(attr(lme4::VarCorr(hurdle_binary_rs)$country, "correlation")[1, 2], 2)`). Zwischen dem Erwerbsniveau der Männer und der Größe des Geschlechtereffekts zeigt sich damit in den Daten kein nennenswerter Zusammenhang.
+
+```{r}
+#| label: fig-logit-ranef
+#| fig-cap: "Länderspezifische Geschlechterunterschiede in der Erwerbswahrscheinlichkeit (AME). Punkte: länderspezifische AMEs. Schwarze Linie und graue Fläche: AME für den Durchschnitt über die Länder (Random Effect = 0) mit 95%-KI. gestrichelte Linie: Null-Effekt"
+#| fig-height: 8
+#| fig-width: 7
+#| echo: false
+#| message: false
+#| warning: false
+#| fig-pos: "H"
+
+# ============================================================
+# Plot 1: Logit RS -- country-specific AMEs + overall AME
+# ============================================================
+
+# 1. Country-specific AMEs (including random effects)
+ame_country_logit <- marginaleffects::avg_comparisons(
+  hurdle_binary_rs,
+  variables = "gen",
+  by        = "country",
+  type      = "response",
+  re.form   = NULL
+)
+
+# 2. AME at random effect = 0 (typical country), from the precomputed list
+ame_overall_gen <- ames$logit_rs_re |>
+  dplyr::filter(term == "gen")
+
+overall_est  <- ame_overall_gen$estimate
+overall_low  <- ame_overall_gen$conf.low
+overall_high <- ame_overall_gen$conf.high
+
+# 3. Plot
+p1 <- ggplot(
+  ame_country_logit,
+  aes(x = estimate, y = reorder(country, estimate))
+) +
+  # Zero line (no effect)
+  geom_vline(xintercept = 0, linetype = "dashed", color = "grey50") +
+  # 95% CI of the overall AME as background band
+  annotate(
+    "rect",
+    xmin = overall_low, xmax = overall_high,
+    ymin = -Inf, ymax = Inf,
+    fill = "darkgrey", alpha = 0.15
+  ) +
+  # Point estimate of the overall AME
+  geom_vline(xintercept = overall_est, color = "black", linewidth = 0.8) +
+  # Country-specific AMEs (points and confidence intervals)
+  geom_pointrange(aes(xmin = conf.low, xmax = conf.high)) +
+  # Exact point estimates as labels above each point
+  geom_text(
+    aes(label = sprintf("%.3f", estimate)),
+    vjust = -0.9,
+    size  = 3
+  ) +
+  # Label for the overall AME at the top of the plot
+  annotate(
+    "text",
+    x = overall_est, y = Inf,
+    label = sprintf("Gesamt: %.3f", overall_est),
+    vjust = -0.5, size = 3, fontface = "bold"
+  ) +
+  coord_cartesian(clip = "off") +  # allows the overall label above the panel
+  labs(
+    title = "AME_gen nach Land mit 95%-KI",
+    x     = "Durchschnittliche Erwerbswahrscheinlichkeit von Frauen im Vergleich zu Männern nach Land, AME_Gen",
+    y     = NULL
+  ) +
+  theme_minimal() +
+  theme(plot.margin = margin(t = 20, r = 10, b = 10, l = 10))
+
+
+# ============================================================
+# Plot 2: Gauss RS -- country-specific AMEs (COMMENTED OUT)
+# ============================================================
+
+# ame_country_gauss <- marginaleffects::avg_comparisons(
+#   hurdle_hours_rs,
+#   variables = "gen",
+#   by        = "country",
+#   re.form   = NULL
+# )
+#
+# p2 <- ggplot(
+#   ame_country_gauss,
+#   aes(x = estimate, y = reorder(country, estimate))
+# ) +
+#   geom_vline(
+#     xintercept = 0,
+#     linetype   = "dashed",
+#     color      = "grey40"
+#   ) +
+#   geom_pointrange(
+#     aes(xmin = conf.low, xmax = conf.high)
+#   ) +
+#   # Exact point estimates as labels above each point
+#   geom_text(
+#     aes(label = sprintf("%.2f", estimate)),
+#     vjust = -0.9,
+#     size  = 3
+#   ) +
+#   labs(
+#     title    = "Gauss: Gender-AME nach Land",
+#     subtitle = "Länderspezifische AMEs aus dem Random-Slope-Modell",
+#     x        = "AME Gender: Female − Male (Wochenstunden)",
+#     y        = NULL
+#   ) +
+#   theme_minimal()
+
+
+# Show logit only
+p1
+
+# p1 + p2 + patchwork::plot_layout(ncol = 1)
+
+```
+
+@fig-logit-ranef zeigt die durchschnittlichen länderspezifischen Geschlechtereffekte auf der Wahrscheinlichkeitsskala. Sie reichen von `{r} round(100 * min(ame_country_logit$estimate), 1)` Prozentpunkten (`{r} as.character(ame_country_logit$country[which.min(ame_country_logit$estimate)])`) bis `{r} round(100 * max(ame_country_logit$estimate), 1)` Prozentpunkten (`{r} as.character(ame_country_logit$country[which.max(ame_country_logit$estimate)])`). In `{r} sum(ame_country_logit$conf.high > 0)` der 22 EU-Mitgliedsstaaten schließt das Konfidenzintervall Null nicht aus, dort lässt sich keine systematische Geschlechterlücke zeigen. In den übrigen haben Frauen eine signifikant geringere Erwerbswahrscheinlichkeit. Viele Konfidenzintervalle überlappen, und die Länderwerte sind zum Gesamtmittel hin geschrumpft. Einzelne Rangplätze sind daher nur grob belastbar, belastbar ist vor allem die Unterscheidung zwischen Staaten mit großer und kleiner Lücke. Viele Konfidenzintervalle überlappen, und die Länderwerte sind zum Gesamtmittel hin geschrumpft. Einzelne Rangplätze sind daher nur grob belastbar. Belastbar ist vor allem die Unterscheidung zwischen Staaten mit großer und kleiner Lücke.
+
+# Diskussion und Fazit
+
+Die Arbeit fragte, ob und wie sich die untersuchten EU-Mitgliedstaaten in der geschlechtsspezifischen Erwerbsbeteiligung unterscheiden. Dabei deuten die Befunde stark darauf hin, dass es eine Erwerbslücke zu Lasten der Erwerbsbeteiligung von Frauen gibt, welche signifikant zwischen den untersuchten EU-Mitgliedsstaaten variiert. Beide im Theoriekapitel aufgestelten Hypothesen werden gestützt. Die Ergebnisse zeigen, dass die Erwerbsbeteiligung von Frauen in allen Staaten, Estland und Finnland ausgenommen, signifikant niedriger ist als die von Männern, wobei die Größe der Lücke stark variiert.
+
+Die größten Lücken zeigen sich in Griechenland, Italien, Irland, Polen und Zypern, die kleinsten in Estland, Finnland, Schweden und Slowenien, wobei Estland und Finnland keine signifikante Lücke aufweisen. Aus der Theorie lassen sich Mechanismen ableiten, die der jeweilige Staat als Proxyvariable abbildet. Nach @lewis1992 sind es institutionelle Ausgestaltungen wie die von Besteuerung, Kinderbetreuung oder Elternversicherung, die bestimmen, wie stark Sorgearbeit privat in der Familie verbleibt. Hinzu kommen kulturelle Geschlechternormen, wobei @kesler2018 zufolge eine stärkere institutionelle Unterstützung deren Wirkung abschwächt.
+
+Im Beschluss (EU) 2022/2296 fordert die europäische Union die Mitgliedstaaten auf, das geschlechtsspezifische Beschäftigungsgefälle zu verringern und die Erwerbsbeteiligung von Frauen zu erhöhen. Die Befunde zeigen, dass der Handlungsbedarf dafür sehr ungleich verteilt ist: Während in Estland und Finnland keine Lücke besteht, liegt sie in Griechenland, Italien und Irland deutlich über dem Durchschnitt. Eine einheitliche Zielsetzung trifft also auf sehr unterschiedliche Ausgangslagen. Die vom Beschluss genannten Hebel, insbesondere der Zugang zu erschwinglicher Kinderbetreuung und Langzeitpflege, sind in den Staaten mit großen Lücken besonders relevant, sofern Lewis Argumentation zutrifft. Ob diese Maßnahmen die Lücke tatsächlich verringern, kann die vorliegende Analyse nicht beantworten.
+
+Welche institutionellen Faktoren welchen Einfluss haben und inwiefern kulturelle Unterschiede die Lücke beeinflussen, bleibt damit an dieser Stelle unklar, da der Fokus dieser Arbeit auf der methodischen Abbildung dieser Heterogenität mittels Random Slopes lag. Dies bildet die wichtigste Einschränkung der vorliegenden Forschungsergebnisse.
+
+Anschlussarbeiten sollten demnach die Länder-Proxys durch konkrete Indikatoren ersetzen, etwa Regelungen zu Kinderbetreuung, Elternzeit sowie Besteuerung und für diese Cross-Level-Interaktionen mit dem Geschlecht schätzen. Außerdem wäre zu prüfen, ob die Lücke mit Kindern im Haushalt zunimmt und ob sich die EU-Mitgliedsstaaten bei anderen Arbeitsmarktaspekten, etwa dem Arbeitsvolumen, anders ordnen als bei der bloßen Erwerbsbeteiligung.
+
+\newpage
+
+# Literaturverzeichnis
+
+::: {#refs}
+:::
+
+\newpage
+
+# Anhang
+
+```{r}
+#| label: Prüfungs Kontrollvariablen
+#| echo: false
+
+# --------------------------------------------
+# 1. DATA CLEANING & PREPARATION 
+# --------------------------------------------
+ess_clean <- ess_full |>
+  mutate(
+    emp_num  = if_else(emp %in% c(1, "1", "employed", "Employed"), 1, 0,
+                       missing = NA_real_),
+    edu_num  = if_else(edu == "in education", 1, 0, missing = NA_real_),
+    # Center age at the sample mean, then square the centered variable
+    age_c    = age - mean(age, na.rm = TRUE),
+    age_c_sq = age_c^2
+  ) |>
+  filter(!is.na(emp_num), !is.na(gen), !is.na(age), !is.na(edu_num),
+         !is.na(cntry))
+
+# --------------------------------------------
+# 2. STEP 1: ORTHOGONALITY CHECKS (pooled, single level) 
+# --------------------------------------------
+
+ortho_edu <- chisq.test(table(ess_clean$gen, ess_clean$edu))
+ortho_age <- t.test(age ~ gen, data = ess_clean)
+
+cat("=========================================================\n")
+cat("1. ORTHOGONALITÄTSTESTS (Unabhängigkeit Z vs. X = gen)\n")
+cat("=========================================================\n")
+cat("Edu vs. Gen (Chi²-Test): Chi² =", round(ortho_edu$statistic, 3),
+    "| p =", round(ortho_edu$p.value, 4), "\n")
+cat("Age vs. Gen (t-Test):      t =", round(ortho_age$statistic, 3),
+    "| p =", round(ortho_age$p.value, 4), "\n\n")
+
+# --------------------------------------------
+# 3. STEP 2: ESTIMATE FOUR RANDOM-INTERCEPT MODELS 
+# Random intercept for country; bobyqa is usually more stable for glmer
+#-------------------------------------------- 
+
+ctrl <- glmerControl(optimizer = "bobyqa", optCtrl = list(maxfun = 2e5))
+
+m1_bivariat <- glmer(emp_num ~ gen + (1 | cntry),
+                     data = ess_clean, family = binomial, control = ctrl)
+m2_edu_only <- glmer(emp_num ~ gen + edu_num + (1 | cntry),
+                     data = ess_clean, family = binomial, control = ctrl)
+m3_age_only <- glmer(emp_num ~ gen + age_c + age_c_sq + (1 | cntry),
+                     data = ess_clean, family = binomial, control = ctrl)
+m4_voll     <- glmer(emp_num ~ gen + age_c + age_c_sq + edu_num + (1 | cntry),
+                     data = ess_clean, family = binomial, control = ctrl)
+
+# --------------------------------------------
+# 4. STEP 3: DO THE CONTROLS EXPLAIN THE OUTCOME INDIVIDUALLY (Z -> Y)? 
+# --------------------------------------------
+
+cat("=========================================================\n")
+cat("2. EINZELEFFEKTE DER KONTROLLVARIABLEN AUF DAS OUTCOME Y\n")
+cat("=========================================================\n")
+cat("A. Effekt von edu (isoliert):\n")
+print(tidy(m2_edu_only, effects = "fixed") |>
+        filter(term == "edu_num") |>
+        select(term, estimate, std.error, statistic, p.value))
+
+cat("\nB. Effekte von age & age² (isoliert):\n")
+print(tidy(m3_age_only, effects = "fixed") |>
+        filter(term %in% c("age_c", "age_c_sq")) |>
+        select(term, estimate, std.error, statistic, p.value))
+cat("\n")
+
+# --------------------------------------------
+# 5. STEP 4: COMPARISON TABLE (COEFFICIENT SCALE)
+# --------------------------------------------
+ 
+models_list <- list(
+  "1. Bivariat"               = m1_bivariat,
+  "2. Nur edu"                = m2_edu_only,
+  "3. Nur age (quadratisch)"  = m3_age_only,
+  "4. Vollmodell (edu + age)" = m4_voll
+)
+
+robinson_comp <- bind_rows(
+  lapply(names(models_list), function(mod_name) {
+    mod <- models_list[[mod_name]]
+    tidy(mod, effects = "fixed") |>
+      filter(str_detect(term, "gen")) |>
+      mutate(Modell = mod_name, AIC = AIC(mod))
+  })
+)
+
+beta_ref <- abs(robinson_comp$estimate[1])
+se_ref   <- robinson_comp$std.error[1]
+z_ref    <- abs(robinson_comp$statistic[1])
+
+robinson_final <- robinson_comp |>
+  mutate(
+    `Delta_Beta (%)` = (abs(estimate) - beta_ref) / beta_ref * 100,
+    `Delta_SE (%)`   = (std.error - se_ref) / se_ref * 100,
+    `Delta_z (%)`    = (abs(statistic) - z_ref) / z_ref * 100
+  ) |>
+  select(Modell, Beta = estimate, `Delta_Beta (%)`, SE = std.error,
+         `Delta_SE (%)`, z_Score = statistic, `Delta_z (%)`, AIC)
+
+cat("=========================================================\n")
+cat("3.RANDOM INTERCEPT\n")
+cat("=========================================================\n")
+print(robinson_final)
+
+# 5b. RANDOM INTERCEPT VARIANCE ACROSS MODELS ---------------------------------
+# Shows whether the controls change the between-country variance
+ri_var <- sapply(models_list, function(m) as.numeric(VarCorr(m)$cntry[1]))
+cat("\nRandom-Intercept-Varianz (Land) je Modell:\n")
+print(round(ri_var, 4))
+
+# re.form = NA -> population-level predictions (random effect set to 0)
+# Default factor contrast for gen: Female - Male
+# Note: SEs are delta-method SEs based on the fixed-effects vcov only
+
+ame_comp <- bind_rows(
+  lapply(names(models_list), function(mod_name) {
+    avg_comparisons(
+      models_list[[mod_name]],
+      variables = "gen",
+      re.form   = NA
+    ) |>
+      as_tibble() |>
+      mutate(Modell = mod_name)
+  })
+) |>
+  select(Modell, AME = estimate, SE = std.error, z = statistic,
+         conf.low, conf.high)
+
+ame_ref    <- ame_comp$AME[1]
+ame_se_ref <- ame_comp$SE[1]
+ame_z_ref  <- abs(ame_comp$z[1])
+
+ame_final <- ame_comp |>
+  mutate(
+    `Delta_AME (%)` = (AME - ame_ref) / abs(ame_ref) * 100,
+    `Delta_SE (%)`  = (SE - ame_se_ref) / ame_se_ref * 100,
+    `Delta_z (%)`   = (abs(z) - ame_z_ref) / ame_z_ref * 100
+  )
+
+cat("=========================================================\n")
+cat("4. AME FÜR GEN (FEMALE - MALE), POPULATION-LEVEL (re.form = NA)\n")
+cat("=========================================================\n")
+print(ame_final, width = Inf)
+
+```
+
+```{r}
+#| label: appendix-predicted-probabilities
+#| echo: false
+#| warning: false
+#| message: false
+#| fig-cap: "Jeder Punkt repräsentiert eine Person. Die x-Achse zeigt die geschätzte Wahrscheinlichkeit, erwerbstätig zu sein. Die Streuung auf der y-Achse dient lediglich der Entzerrung"
+
+preds <- bind_rows(
+  predictions(hurdle_binary_ri, type = "response", re.form = NA) |>
+    as.data.frame() |>
+    mutate(model = "Random intercept"),
+  predictions(hurdle_binary_rs, type = "response", re.form = NA) |>
+    as.data.frame() |>
+    mutate(model = "Random slope")
+) |>
+  rename(prob = estimate)
+
+ggplot(preds, aes(x = prob, y = model, color = model)) +
+  geom_point(
+    position = position_jitter(height = 0.3, seed = 123),
+    size = 0.7,
+    alpha = 0.6
+  ) +
+  scale_x_continuous(limits = c(0, 1)) +
+  scale_color_manual(
+    values = c("Random intercept" = "#1f77b4", "Random slope" = "#ff7f0e"),
+    labels = c("Random intercept only", "Random intercept + random slope")
+  ) +
+  labs(
+    x = "Vorhergesagte Wahrscheinlichkeit",
+    y = NULL,
+    color = "Modell",
+    title = "Vorhergesagte Wahrscheinlichkeiten der beiden Logit-Modelle"
+  ) +
+  theme_minimal(base_size = 11) +
+  theme(
+    legend.position = "bottom",
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    plot.title = element_text(face = "bold")
+  ) +
+  guides(color = guide_legend(title = "Modell"))
+```
+
+\newpage
+
+# Selbstständigkeitserklärung {.unnumbered}
+
+(Name)
+
+Christopher Berberich
+
+ERKLÄRUNG
+
+Bezüglich meiner schriftlichen Prüfungsleistung mit dem Thema:
+
+Geschlechterspezifische Unterschiede in der Erwerbsbeteiligung in den EU-Mitgliedstaaten
+
+1.  die Arbeit selbständig verfasst habe,
+2.  keine anderen als die angegebenen Quellen und Hilfsmittel benutzt und alle wörtlich oder sinngemäß übernommenen Textstellen als solche kenntlich gemacht habe, 3 \[zutreffendes bitte ankreuzen und ausfüllen\]
+
+\[ \] bei der schriftlichen Abfassung des Texts kein Programm künstlicher Intelligenz verwendet habe,
+
+\[x\] bei der schriftlichen Abfassung des Texts Programme künstlicher Intelligenz verwendet habe. Die Nutzungszwecke und genutzten Anwendungen sind dieser Eigenständigkeitserklärung als Anhang beigefügt. 4. die Arbeit in keiner anderen Prüfung als Prüfungsleistung vorgelegt habe.
+
+Mir ist bekannt, dass bei der Bewertung der Arbeit Software zur Prüfung auf Plagiate und Textproduktion durch künstliche Intelligenz zum Einsatz kommen kann. Mit der Abgabe versichere ich, dass ich den Aufbau und die zentrale Argumentation meiner Arbeit selbst entwickelt habe, alle Quellen selbst geprüft und nachvollzogen, und alle übernommenen Gedanken, Zitate und Hilfsmittel korrekt angegeben habe. Sofern künstliche Intelligenz unterstützend genutzt wurde, habe ich in der angehängten Übersicht klar erkennbar dargestellt, mit welchen Anwendungen und zu welchem Zweck diese genutzt wurde.
+
+Leipzig, den 01.11.2026
+
+..................................................................... (Unterschrift)
+
+KI-spezifischer Anhang zur Eigenständigkeitserklärung Dieser Anhang ist nur dann auszufüllen, wenn unter (3) der Eigenständigkeitserklärung die Nutzung künstlicher Intelligenz angegeben wurde. Bitte für jeden einzelnen Arbeitsschritt in der linken Spalte ankreuzen, ob dabei KI verwendet wurde und die eingesetzten Systeme nennen. Achtung: Welche Formate der KI-Nutzung zulässig sind, kann je nach Seminar und Lehrperson variieren und wird von der Lehrperson vorab festgelegt.
+
+| Arbeitsschritt | Eingesetzte(s) KI-System(e) |
+|:----------------------------------------------|:------------------------|
+| \[x\] Rechtschreib- und Grammatikprüfung | Claude, Github Copilot |
+| \[\] Erstes Brainstorming zu Themen, Fragestellungen oder Suchbegriffen |  |
+| \[x\] Literaturrecherche | Elicit |
+| \[x\] Unterstützung bei der Erstellung / Überarbeitung von Tabellen oder Abbildungen | Github Copilot |
+| \[ \] Literaturverwaltung und Zitationsmanagement |  |
+| \[x\] Programmieren und Coding, und zwar: | Claude, Github Copilot |
+| \[ \] z. B. Aufbereitung und Auswertung qualitativer oder quantitativer Daten, und zwar: |  |
+| \[ \] z. B. Zuordnung von Themen / Codes in Programmen zur Textauswertung wie MaxQDA |  |
+| \[ \] Übersetzung selbstverfasster Texte |  |
+| \[ \] Sonstiges |  |
