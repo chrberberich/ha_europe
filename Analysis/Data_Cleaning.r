@@ -18,7 +18,7 @@ library(tidyverse)
 # 3. Read ESS data
 # ------------------------------------------------------------
 
-ess <- read_csv("Data/ESS11e04_2-subset/ESS11e04_2-subset.csv")
+ess <- read_csv("Data/ESS11e04_2-subset.csv")
 
 # Check for parsing problems
 problems(ess)
